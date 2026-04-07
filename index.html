@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { box-sizing: border-box; margin:0; padding:0; }
+body {
+  font-family: Arial;
+  margin:0;
+  background:#f5f5f5;
+  overflow-x:hidden; /* prevent right overflow */
+}
+.container {
+  max-width: 600px;
+  margin: auto;
+  padding: 10px 12px 10px 12px; /* balanced spacing */
+}
+.card {
+  background:white;
+  padding:16px 14px; /* more even spacing */
+  border-radius:12px;
+  margin-bottom:12px;
+  box-shadow:0 2px 5px rgba(0,0,0,0.1);
+  overflow:hidden;
+} 
+h2 { margin-top:0; font-size:18px; }
+label { display:block; margin-top:10px; font-size:14px; }
+input, button {
+  padding:12px;
+  margin-top:8px;
+  width:100%;
+  max-width:100%;
+  border-radius:12px; /* more rounded */
+  border:1px solid #ccc;
+  font-size:16px;
+  display:block;
+  outline:none;
+}
+
+/* smoother input look */
+input {
+  background:#f9f9f9;
+  border:1px solid #ddd;
+}
+
+input:focus {
+  border-color:#4CAF50;
+  box-shadow:0 0 0 2px rgba(76,175,80,0.2);
+}
+button { background:#4CAF50; color:white; border:none; }
+button:active { transform:scale(0.98); }
+
+/* FIX: keep inputs inside card */
+input { width:100%; display:block; }
+
+.calendar { display:grid; grid-template-columns: repeat(7,1fr); gap:6px; }
+.day { background:white; padding:12px 0; text-align:center; border-radius:8px; font-size:14px; cursor:pointer; }
+.day:hover { background:#ddd; }
+
+#details { font-size:14px; }
+
+/* FIX: limit chart height */
+.chart-container {
+  position: relative;
+  height: 220px;
+}
+canvas { width:100% !important; height:100% !important; }
+
+@media (max-width: 480px) {
+  h2 { font-size:16px; }
+  input, button { font-size:14px; padding:10px; }
+  .day { font-size:12px; padding:10px 0; }
+  .chart-container { height:180px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="card">
+<h2>Add Shift</h2>
+<label>Date:</label>
+<input type="date" id="date">
+
+<label>From:</label>
+<input type="time" id="from">
+
+<label>To:</label>
+<input type="time" id="to">
+
+<button onclick="saveShift()">Save Shift</button>
+</div>
+
+<div class="card">
+<h2>Weekly Hours & Pay (Mon - Sun)</h2>
+<div class="chart-container">
+  <canvas id="chart"></canvas>
+</div>
+</div>
+
+<div class="card">
+<h2>Calendar</h2>
+<div class="calendar" id="calendar"></div>
+</div>
+
+<div class="card" id="details" style="display:none;"></div>
+
+</div>
+
+<script>
+let data = JSON.parse(localStorage.getItem('shifts') || '{}');
+let chartInstance = null;
+
+function getPay(date, hours) {
+    let day = new Date(date).getDay();
+    let rate = (day === 0 || day === 6) ? 14 : 13;
+    return hours * rate;
+}
+
+function saveShift() {
+    let date = document.getElementById('date').value;
+    let from = document.getElementById('from').value;
+    let to = document.getElementById('to').value;
+
+    let hours = (new Date(`1970-01-01T${to}`) - new Date(`1970-01-01T${from}`)) / 3600000;
+    let pay = getPay(date, hours);
+
+    data[date] = { from, to, hours, pay };
+    localStorage.setItem('shifts', JSON.stringify(data));
+
+    alert('Saved!');
+    renderChart();
+    renderCalendar();
+}
+
+function getWeekData() {
+    let week = {};
+    let today = new Date();
+
+    let day = today.getDay();
+    let diffToMonday = (day === 0 ? -6 : 1 - day);
+
+    let monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+
+    for (let i = 0; i < 7; i++) {
+        let d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+
+        let key = d.toISOString().split('T')[0];
+
+        if (data[key]) {
+            week[key] = data[key];
+        } else {
+            week[key] = { hours: 0, pay: 0 };
+        }
+    }
+    return week;
+}
+
+function renderChart() {
+    let week = getWeekData();
+
+    let labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    let hours = [];
+    let pay = [];
+
+    Object.values(week).forEach(d => {
+        hours.push(d.hours);
+        pay.push(d.pay);
+    });
+
+    if (chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(document.getElementById('chart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Hours', data: hours },
+                { label: 'Pay ($)', data: pay }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+function renderCalendar() {
+    let cal = document.getElementById('calendar');
+    cal.innerHTML = '';
+
+    let today = new Date();
+    let year = today.getFullYear();
+    let month = today.getMonth();
+
+    let days = new Date(year, month+1, 0).getDate();
+
+    for (let i = 1; i <= days; i++) {
+        let date = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        let div = document.createElement('div');
+        div.className = 'day';
+        div.innerText = i;
+
+        if (data[date]) {
+            div.style.background = '#b6fcb6';
+        }
+
+        div.onclick = () => showDetails(date);
+
+        // ✅ Long press to delete
+        let pressTimer;
+
+        div.addEventListener('touchstart', () => {
+            pressTimer = setTimeout(() => {
+                handleDelete(date);
+            }, 700); // long press duration
+        });
+
+        div.addEventListener('touchend', () => {
+            clearTimeout(pressTimer);
+        });
+
+        div.addEventListener('mousedown', () => {
+            pressTimer = setTimeout(() => {
+                handleDelete(date);
+            }, 700);
+        });
+
+        div.addEventListener('mouseup', () => {
+            clearTimeout(pressTimer);
+        });
+        cal.appendChild(div);
+    }
+}
+
+function handleDelete(date) {
+    if (!data[date]) return;
+
+    if (confirm(`Delete shift on ${date}?`)) {
+        delete data[date];
+        localStorage.setItem('shifts', JSON.stringify(data));
+        renderChart();
+        renderCalendar();
+        document.getElementById('details').style.display = 'none';
+    }
+}
+
+function showDetails(date) {
+    let d = document.getElementById('details');
+
+    if (data[date]) {
+        let s = data[date];
+        d.style.display = 'block';
+        d.innerHTML = `
+            <h3>${date}</h3>
+            From: ${s.from}<br>
+            To: ${s.to}<br>
+            Hours: ${s.hours.toFixed(2)}<br>
+            Pay: $${s.pay.toFixed(2)}
+        `;
+    } else {
+        d.style.display = 'block';
+        d.innerHTML = `<h3>${date}</h3>No data`;
+    }
+}
+
+renderChart();
+renderCalendar();
+</script>
+
+</body>
+</html>
