@@ -10,32 +10,56 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial;background:#f5f5f5}
 
-/* 🔥 HAMBURGER */
+/* 🔥 HAMBURGER BUTTON */
 .menu-btn{
+  width:50px;
+  height:50px;
   position:fixed;
   top:15px;
   left:15px;
-  font-size:22px;
   background:white;
-  border:none;
-  border-radius:8px;
-  padding:8px 12px;
-  box-shadow:0 2px 5px rgba(0,0,0,0.2);
-  z-index:1000;
+  border-radius:12px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  z-index:1001;
+  cursor:pointer;
+}
+
+.menu-btn span{
+  width:22px;
+  height:3px;
+  background:#333;
+  border-radius:2px;
+  transition:0.3s;
+}
+
+/* 🔥 ANIMATION TO X */
+.menu-btn.active span:nth-child(1){
+  transform:rotate(45deg) translate(5px,5px);
+}
+.menu-btn.active span:nth-child(2){
+  opacity:0;
+}
+.menu-btn.active span:nth-child(3){
+  transform:rotate(-45deg) translate(5px,-5px);
 }
 
 /* 🔥 SIDEBAR */
 .sidebar{
   position:fixed;
   top:0;
-  left:-220px;
-  width:200px;
+  left:-260px;
+  width:240px;
   height:100%;
   background:white;
-  box-shadow:2px 0 8px rgba(0,0,0,0.2);
   padding:20px;
-  transition:0.3s;
-  z-index:999;
+  box-shadow:2px 0 10px rgba(0,0,0,0.2);
+  transition:0.3s ease;
+  z-index:1000;
 }
 
 .sidebar.open{
@@ -45,14 +69,15 @@ body{font-family:Arial;background:#f5f5f5}
 .sidebar button{
   width:100%;
   padding:12px;
-  margin-top:10px;
+  margin-top:15px;
   border:none;
-  border-radius:10px;
+  border-radius:12px;
   background:#4CAF50;
   color:white;
+  font-size:16px;
 }
 
-/* overlay */
+/* 🔥 OVERLAY */
 .overlay{
   position:fixed;
   top:0;
@@ -60,15 +85,23 @@ body{font-family:Arial;background:#f5f5f5}
   width:100%;
   height:100%;
   background:rgba(0,0,0,0.3);
-  display:none;
+  opacity:0;
+  pointer-events:none;
+  transition:0.3s;
   z-index:998;
 }
 
 .overlay.show{
-  display:block;
+  opacity:1;
+  pointer-events:auto;
 }
 
-.container{max-width:600px;margin:auto;padding:10px;margin-top:50px}
+.container{
+  max-width:600px;
+  margin:auto;
+  padding:10px;
+  margin-top:60px;
+}
 
 .card{
   background:white;
@@ -100,13 +133,16 @@ h3{text-align:center}
 
 <body>
 
-<!-- ☰ MENU BUTTON -->
-<button class="menu-btn" onclick="toggleMenu()">☰</button>
+<!-- 🍔 MENU BUTTON -->
+<div class="menu-btn" onclick="toggleMenu()">
+  <span></span>
+  <span></span>
+  <span></span>
+</div>
 
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
   <h3>Menu</h3>
-  <button onclick="location.href='add.html'">+ Add Shift</button>
   <button onclick="location.href='settings.html'">⚙ Settings</button>
 </div>
 
@@ -140,6 +176,7 @@ let chart;
 
 /* 🔥 MENU TOGGLE */
 function toggleMenu(){
+  document.querySelector('.menu-btn').classList.toggle('active');
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
 }
@@ -173,7 +210,10 @@ function renderChart(){
  if(chart) chart.destroy();
  chart=new Chart(document.getElementById('chart'),{
   type:'bar',
-  data:{labels,datasets:[{label:'Hours',data:hours},{label:'Pay ($)',data:pay}]},
+  data:{labels,datasets:[
+    {label:'Hours',data:hours},
+    {label:'Pay ($)',data:pay}
+  ]},
   options:{responsive:true,maintainAspectRatio:false}
  });
 }
@@ -194,20 +234,58 @@ document.addEventListener('touchend',e=>{
 function renderCalendar(){
  let cal=document.getElementById('calendar');
  cal.innerHTML='';
+
  let today=new Date();
  let year=today.getFullYear();
  let month=today.getMonth();
+
+ let firstDay=new Date(year,month,1).getDay();
  let days=new Date(year,month+1,0).getDate();
+
+ let daysOfWeek=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+ daysOfWeek.forEach(d=>{
+  let div=document.createElement('div');
+  div.innerHTML='<b>'+d+'</b>';
+  div.style.textAlign='center';
+  cal.appendChild(div);
+ });
+
+ for(let i=0;i<firstDay;i++){
+  cal.appendChild(document.createElement('div'));
+ }
 
  for(let i=1;i<=days;i++){
   let date=`${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+
   let div=document.createElement('div');
   div.className='day';
   div.innerText=i;
 
   if(data[date]) div.style.background='#b6fcb6';
 
-  div.onclick=()=>showDetails(date);
+   // tap
+let lastTap = 0;
+let tapTimer;
+
+div.addEventListener('click', () => {
+  let now = new Date().getTime();
+  let diff = now - lastTap;
+
+  clearTimeout(tapTimer);
+
+  if (diff < 300) {
+    // ✅ DOUBLE TAP → EDIT
+    window.location.href = `add.html?date=${date}`;
+  } else {
+    // ⏳ WAIT to confirm it's not double tap
+    tapTimer = setTimeout(() => {
+      // 👁 SINGLE TAP → SHOW DETAILS
+      showDetails(date);
+    }, 300);
+  }
+
+  lastTap = now;
+});
 
   let timer;
   div.addEventListener('touchstart',()=>timer=setTimeout(()=>deleteShift(date),700));
