@@ -75,8 +75,25 @@ label{margin-top:10px;display:block}
 </div>
 
 <script>
-let data=JSON.parse(localStorage.getItem('shifts')||'{}');
-let settings=JSON.parse(localStorage.getItem('settings')||'{"weekday":13,"weekend":14}');
+let data = JSON.parse(localStorage.getItem('shifts')||'{}');
+let settings = JSON.parse(localStorage.getItem('settings')||'{"weekday":13,"weekend":14}');
+
+// ✅ RUN ON PAGE LOAD (FIXED)
+document.addEventListener("DOMContentLoaded", function(){
+  let params = new URLSearchParams(window.location.search);
+  let date = params.get('date');
+
+  if(date){
+    document.getElementById('date').value = date;
+
+    // 🔥 AUTO LOAD IF EXISTS (edit mode)
+    if(data[date]){
+      document.getElementById('from').value = data[date].from;
+      document.getElementById('to').value = data[date].to;
+      document.getElementById('break').value = data[date].break || 0;
+    }
+  }
+});
 
 function save(){
  let date=document.getElementById('date').value;
